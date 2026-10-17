@@ -1,7 +1,6 @@
 // UI code: connects the quiz logic (quiz.js) to the page (index.html).
 
-const state = { questions: [], current: 0, score: 0, answered: false, timeLeft: 0 };
-const QUESTION_TIME_SECONDS = 15;
+let state = createQuiz([]);
 let timerInterval = null;
 
 const startScreen = document.getElementById("start-screen");
@@ -31,9 +30,7 @@ function stopTimer() {
 
 function startQuiz() {
   stopTimer();
-  state.questions = shuffle(QUESTIONS);
-  state.current = 0;
-  state.score = 0;
+  state = createQuiz(shuffle(QUESTIONS));
   showScreen(quizScreen);
   renderQuestion();
 }
@@ -41,9 +38,7 @@ function startQuiz() {
 function renderQuestion() {
   stopTimer();
   const question = state.questions[state.current];
-  state.answered = false;
   progressText.textContent = `Question ${state.current + 1} of ${state.questions.length}`;
-  state.timeLeft = QUESTION_TIME_SECONDS;
   timerText.textContent = formatTimeLeft(state.timeLeft);
   timerText.classList.remove("warning");
   questionText.textContent = question.question;
@@ -62,7 +57,7 @@ function renderQuestion() {
   });
 
   timerInterval = setInterval(() => {
-    state.timeLeft--;
+    state = tickQuestion(state);
     timerText.textContent = formatTimeLeft(state.timeLeft);
     timerText.classList.toggle("warning", state.timeLeft <= 5);
 
@@ -73,13 +68,16 @@ function renderQuestion() {
 }
 
 function selectAnswer(selectedIndex, selectedButton) {
-  if (!completeQuestion()) return;
+  if (state.answered) return;
 
   const question = state.questions[state.current];
   const buttons = optionsList.querySelectorAll("button");
+  const result = answerQuestion(state, selectedIndex);
+  state = result.state;
+  stopTimer();
+  buttons.forEach((button) => (button.disabled = true));
 
-  if (isCorrect(question, selectedIndex)) {
-    state.score++;
+  if (result.correct) {
     selectedButton.classList.add("correct");
     feedbackText.textContent = "Correct!";
   } else {
@@ -92,20 +90,12 @@ function selectAnswer(selectedIndex, selectedButton) {
   nextButton.focus();
 }
 
-function completeQuestion() {
-  if (state.answered) return false;
-
-  state.answered = true;
-  stopTimer();
-  optionsList.querySelectorAll("button").forEach((button) => (button.disabled = true));
-  return true;
-}
-
 function timeUp() {
-  if (!completeQuestion()) return;
+  stopTimer();
 
   const question = state.questions[state.current];
   const buttons = optionsList.querySelectorAll("button");
+  buttons.forEach((button) => (button.disabled = true));
   buttons[question.answer].classList.add("correct");
   feedbackText.textContent = "Time's up!";
   nextButton.hidden = false;
@@ -114,8 +104,8 @@ function timeUp() {
 
 function nextQuestion() {
   stopTimer();
-  state.current++;
-  if (state.current < state.questions.length) {
+  state = advanceQuestionState(state);
+  if (!isQuizFinished(state)) {
     renderQuestion();
   } else {
     showResults();

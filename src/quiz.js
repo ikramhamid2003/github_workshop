@@ -1,6 +1,21 @@
 // Core quiz logic.
 // This file has NO browser (DOM) code so it can be tested with Node.js.
 
+const QUESTION_TIME_SECONDS = 15;
+
+/**
+ * Creates a fresh quiz state for the supplied questions.
+ */
+function createQuiz(questions) {
+  return {
+    questions: [...questions],
+    current: 0,
+    score: 0,
+    answered: false,
+    timeLeft: QUESTION_TIME_SECONDS,
+  };
+}
+
 /**
  * Returns a new array with the items in random order.
  * The original array is not changed.
@@ -19,6 +34,63 @@ function shuffle(items) {
  */
 function isCorrect(question, selectedIndex) {
   return question.answer === selectedIndex;
+}
+
+/**
+ * Records an answer without changing the supplied state.
+ */
+function answerQuestion(state, selectedIndex) {
+  if (state.answered || isQuizFinished(state)) {
+    return { state, correct: false };
+  }
+
+  const correct = isCorrect(state.questions[state.current], selectedIndex);
+  return {
+    state: {
+      ...state,
+      score: state.score + (correct ? 1 : 0),
+      answered: true,
+    },
+    correct,
+  };
+}
+
+/**
+ * Returns true when there are no more questions to answer.
+ */
+function isQuizFinished(state) {
+  return state.current >= state.questions.length;
+}
+
+/**
+ * Advances to the next question and resets its answer and timer state.
+ */
+function advanceQuestionState(state) {
+  const current = state.current + 1;
+  if (current >= state.questions.length) {
+    return { ...state, current };
+  }
+
+  return {
+    ...state,
+    current,
+    answered: false,
+    timeLeft: QUESTION_TIME_SECONDS,
+  };
+}
+
+/**
+ * Decreases the timer by one second and marks the question answered at zero.
+ */
+function tickQuestion(state) {
+  if (state.answered) return state;
+
+  const timeLeft = Math.max(0, state.timeLeft - 1);
+  return {
+    ...state,
+    timeLeft,
+    answered: timeLeft === 0,
+  };
 }
 
 /**
@@ -60,6 +132,11 @@ function formatTimeLeft(seconds) {
 // Lets Node.js tests load this file. Browsers ignore this block.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
+    createQuiz,
+    answerQuestion,
+    isQuizFinished,
+    advanceQuestionState,
+    tickQuestion,
     shuffle,
     isCorrect,
     calculatePercentage,
